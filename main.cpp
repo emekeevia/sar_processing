@@ -23,24 +23,42 @@ struct Satellite{
     double f_c = 1.0e+10; //Central frequency
     double alpha = 0.52359877559829893; //squint angle of sight сделать из этого вектор
     double squint = M_PI/2.0;
+    double L;
     //угол скольжения - угол между направлением на Надир и на аппарат
     vector<vector<double>> pos;
+    vector<double> r;
+    double min_r = 1000000000000.0;
+    size_t size_range;
+    size_t size_azimuth;
+    Satellite(size_t size_az, size_t size_r):size_azimuth(size_az), size_range(size_r){
+        r = vector<double>(size_azimuth);
+    }
 
-    void make_coordinates(size_t size_az){
+    void make_coordinates(){
         double R0_apCenter = 10000.0;
         double Xc = R0_apCenter*cos(alpha);
         //y
         double dy = V/prf;
         double Y_c = Xc*tan(M_PI/2.0-squint);
-        vector<double> y = fill_up(-size_az/2, size_az/2, size_az)*dy + vector<double>(size_az,Y_c);
+        vector<double> y = fill_up(-static_cast<int>(size_azimuth/2), static_cast<int>(size_azimuth/2), static_cast<int>(size_azimuth))*dy ;
+        y = y + vector<double>(size_azimuth,Y_c);
         //z
         double h = 5000.0;
         //pos
-        pos = vector<vector<double>>(size_az, vector<double>(3));
-        for(size_t i = 0; i < size_az; i++){
+        pos = vector<vector<double>>(size_azimuth, vector<double>(3));
+        for(size_t i = 0; i < size_azimuth; i++){
             pos[i][0] = Xc;
             pos[i][1] = y[i];
             pos[i][2] = h;
+        }
+        L = sqrt((pos[0][0] - pos[size_azimuth-1][0])*(pos[0][0] - pos[size_azimuth-1][0]) +
+                         (pos[0][1] - pos[size_azimuth-1][1])*(pos[0][1] - pos[size_azimuth-1][1]) +
+                         (pos[0][2] - pos[size_azimuth-1][2])*(pos[0][2] - pos[size_azimuth-1][2]));
+        for(size_t i = 0; i < size_azimuth; i++){
+            r[i] = sqrt(pos[i][0]*pos[i][0] + pos[i][1] * pos[i][1] + pos[i][2] * pos[i][2]);
+            if(r[i] < min_r){
+                min_r = r[i];
+            }
         }
     }
 
@@ -89,24 +107,24 @@ void shift(vector<vector<std::complex<double>>> &Raw_data){
     simple_shift(Raw_data);
 }
 
-void RVP_correct(vector<vector<std::complex<double>>> &Raw_data, double fs, double K_r, size_t size_range, size_t size_azimuth, double tau_p){
+void RVP_correct(vector<vector<std::complex<double>>> &Raw_data, Satellite& sat){
     double c = 3e8;
-    double dr = c/(2*tau_p * K_r);
-    vector<double> f_r = fill_up(-size_range/2, size_range/2, static_cast<int>(size_range))*(2.0*K_r*dr/c);//range frequency
+    double dr = c/(2*sat.tau_p * sat.K_r);
+    vector<double> f_r = fill_up(-sat.size_range/2, sat.size_range/2, static_cast<int>(sat.size_range))*(2.0*sat.K_r*dr/c);//range frequency
 
     //cout << "f_r " << f_r << endl;
 
-    vector<vector<std::complex<double>>> RD(size_azimuth, vector<std::complex<double>>(size_range));
-    vector<std::complex<double>> phs_compensation(size_range);
-    double norm_range = 1.0/size_range;
-    for(size_t i = 0; i < size_range;i++){
-        phs_compensation[i] = exp(-M_PI*(f_r[i]*f_r[i]/K_r)*static_cast<complex<double>>(I));
+    vector<vector<std::complex<double>>> RD(sat.size_azimuth, vector<std::complex<double>>(sat.size_range));
+    vector<std::complex<double>> phs_compensation(sat.size_range);
+    double norm_range = 1.0/sat.size_range;
+    for(size_t i = 0; i < sat.size_range;i++){
+        phs_compensation[i] = exp(-M_PI*(f_r[i]*f_r[i]/sat.K_r)*static_cast<complex<double>>(I));
     }
-    //cout << "phs_compensation: " << phs_compensation << endl;
+
     fftw_plan plan_f, plan_b;
     shift(Raw_data);
-    for(size_t i = 0; i < size_azimuth;i++) {
-        plan_f = fftw_plan_dft_1d(size_range, (fftw_complex *) &Raw_data[i][0],
+    for(size_t i = 0; i < sat.size_azimuth;i++) {
+        plan_f = fftw_plan_dft_1d(sat.size_range, (fftw_complex *) &Raw_data[i][0],
                                   (fftw_complex *) &RD[i][0], FFTW_FORWARD, FFTW_ESTIMATE); //making draft plan
 
         fftw_execute(plan_f); // Fourier Transform
@@ -114,12 +132,12 @@ void RVP_correct(vector<vector<std::complex<double>>> &Raw_data, double fs, doub
     }
     shift(RD);
 
-    for(size_t i = 0; i < size_azimuth;i++) {
+    for(size_t i = 0; i < sat.size_azimuth;i++) {
         RD[i] = RD[i] * phs_compensation;
     }
     shift(RD);
-    for(size_t i = 0; i < size_azimuth;i++) {
-        plan_b = fftw_plan_dft_1d(size_range, (fftw_complex*) &RD[i][0],
+    for(size_t i = 0; i < sat.size_azimuth;i++) {
+        plan_b = fftw_plan_dft_1d(sat.size_range, (fftw_complex*) &RD[i][0],
                                   (fftw_complex*) &Raw_data[i][0], FFTW_BACKWARD, FFTW_ESTIMATE);
         fftw_execute(plan_b);
         Raw_data[i] = Raw_data[i] * norm_range;
@@ -129,85 +147,81 @@ void RVP_correct(vector<vector<std::complex<double>>> &Raw_data, double fs, doub
     fftw_destroy_plan(plan_b);
 }
 
-void PHS_to_const_ref(vector<vector<std::complex<double>>> &Raw_data, vector<vector<double>>& pos, double tau_p,double  fs, double K_r, double f_c, size_t size_az, double c = 3.0e8){
-    vector<double> r(size_az);
-    double min_r = 1000000000000.0;
+void PHS_to_const_ref(vector<vector<std::complex<double>>> &Raw_data, Satellite& sat){
 
-    for(size_t i = 0; i < size_az; i++){
-        r[i] = sqrt(pos[i][0]*pos[i][0] + pos[i][1] * pos[i][1] + pos[i][2] * pos[i][2]);
-        if(r[i] < min_r){
-            min_r = r[i];
+
+
+    vector<double> DR = sat.r + vector<double>(sat.size_azimuth,-sat.min_r);
+
+    vector<double> tau = fill_up(-sat.tau_p/2.0, sat.tau_p/2.0, 1.0/sat.fs);// time axis in range
+    vector<vector<std::complex<double>>> e(sat.size_azimuth, vector<complex<double>>(tau.size()));
+
+    for(size_t i = 0; i < sat.size_azimuth; i++){
+        for(size_t j = 0; j < tau.size(); j++){
+            e[i][j] = exp(-4.0*M_PI*sat.K_r *(sat.f_c/sat.K_r + tau[j])* DR[i]*static_cast<complex<double>>(I)/sat.c);
         }
     }
-
-    vector<double> DR = r + vector<double>(size_az,-min_r);
-    vector<double> tau = fill_up(-tau_p/2, tau_p/2, 1/fs);// time axis in range
-    for(size_t i = 0; i < size_az; i++){
+    for(size_t i = 0; i < sat.size_azimuth; i++){
         for(size_t j = 0; j < tau.size(); j++){
-            Raw_data[i][j] = Raw_data[i][j]*exp(-4*M_PI*K_r *(f_c/K_r + tau[j])* DR[i]*static_cast<complex<double>>(I)/c);//Вставить время по дальности
+            Raw_data[i][j] = Raw_data[i][j]*e[i][j];
         }
 
     }
 
 }
+
 void Azimuth_FFT(vector<vector<std::complex<double>>> &Raw_data, size_t size_range, size_t size_azimuth){
+
     fftw_plan plan_f;
     vector<complex<double>> temp(size_azimuth);
+    shift(Raw_data);
     for(size_t j = 0; j < size_range;j++){
         for(size_t i = 0; i < size_azimuth;i++){
             temp[i] = Raw_data[i][j];
         }
+        //plan_f = fftw_plan_dft_1d(size_azimuth, (fftw_complex*) &temp[0],
+        //                          (fftw_complex*) &temp[0], FFTW_FORWARD, FFTW_ESTIMATE); //было
         plan_f = fftw_plan_dft_1d(size_azimuth, (fftw_complex*) &temp[0],
-                                  (fftw_complex*) &temp[0], FFTW_FORWARD, FFTW_ESTIMATE);
+                                  (fftw_complex*) &temp[0], FFTW_BACKWARD, FFTW_ESTIMATE); //сделано на основе RITSAR
         fftw_execute(plan_f);
         for(size_t i = 0; i < size_azimuth;i++){
-            Raw_data[i][j] = temp[i];
+            Raw_data[i][j] = complex<double>(temp[i].real()/size_azimuth, temp[i].imag()/size_azimuth);//https://habr.com/ru/company/otus/blog/449996/
         }
     }
+    shift(Raw_data);
     fftw_destroy_plan(plan_f);
 }
 
-void Matching_filter(vector<vector<std::complex<double>>>& data, size_t size_azimuth, size_t size_range, Satellite& sat, vector<vector<double>>& KY, double KY_min, double KY_max){
-    vector<vector<std::complex<double>>> filter(size_azimuth, vector<std::complex<double>>(size_range));
-    vector<double> KR(size_range);
-    vector<double> KX(size_azimuth);
+void Matching_filter(vector<vector<std::complex<double>>>& data, Satellite& sat){
+    vector<vector<std::complex<double>>> filter(sat.size_azimuth, vector<std::complex<double>>(sat.size_range));
+    vector<double> KR(sat.size_range);
 
-    double  r_c, sqrt_KX_KR, KX_max;
 
+    double phase_mf;
 
     vector<double> t = fill_up(-sat.ta/2, sat.ta/2, 1/sat.prf);// time axis in azimuth
     vector<double> tau = fill_up(-sat.tau_p/2, sat.tau_p/2, 1/sat.fs);// time axis in range
-
-    for(size_t i = 0; i < size_azimuth;i++){
-        KX[i] = 4*M_PI*sat.f_c * cos(sat.alpha)/sat.c;
-        r_c = 0.0;//must depend on azimuth
-        for(size_t j = 0;j < size_range;j++){
-            KR[j] = 4*M_PI*sat.K_r/sat.c * ((sat.f_c/sat.K_r) + tau[j] - 2*r_c/sat.c);//частично реализовано в PHS_to_const_ref
-            if(KR[j] * KR[j] - KX[i] * KX[i] > 0.0){
-                sqrt_KX_KR = sqrt(KR[j] * KR[j] - KX[i] * KX[i]);
-            }else{
-                sqrt_KX_KR = 0.0;
-            }
-            KY[i][j] = sqrt_KX_KR;
-
-            if(sqrt_KX_KR < KY_min){
-                KY_min = sqrt_KX_KR;
-            }
-            if(sqrt_KX_KR > KY_max && KX[i] > KX_max){
-                KY_max = sqrt_KX_KR;
-                KX_max = KX[i];
-            }
-            data[i][j] *= exp(KR[j] * r_c + r_c * sqrt_KX_KR * static_cast<complex<double>>(I));
+    vector<double> KX = fill_up(-static_cast<int>(sat.size_azimuth/2), static_cast<int>(sat.size_azimuth/2), static_cast<int>(sat.size_azimuth)) * (2.0 * M_PI/sat.L);
+    for(size_t i = 0; i < sat.size_azimuth;i++){
+        //r_c = 0.0;//must depend on azimuth
+        for(size_t j = 0;j < sat.size_range;j++){
+            KR[j] = 4*M_PI/sat.c * (sat.f_c + sat.K_r*tau[j]);//частично реализовано в PHS_to_const_ref
+            phase_mf = -sat.min_r*KR[j] + sat.min_r * sqrt(KR[j]*KR[j] - KX[i]*KX[i]);
+            data[i][j] = data[i][j]*exp(phase_mf*static_cast<complex<double>>(I));
         }
     }
 }
+
+void Stolt_interpolation(vector<vector<std::complex<double>>>& data,Satellite& sat){
+
+}
 void RMA(){ //Range migration algorithm or omega-K algorithm
-    vector<vector<std::complex<double>>> Raw_data = read_file(false, "/home/ivan/CLionProjects/Omega-K/Example_with_rectangle.txt");
+    vector<vector<std::complex<double>>> Raw_data = read_file(false, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle.txt");
     size_t size_azimuth = Raw_data.size();
     size_t size_range = Raw_data[0].size();
 
-    Satellite new_sat;
-    new_sat.make_coordinates(size_azimuth);
+    Satellite new_sat(size_azimuth, size_range);
+    new_sat.make_coordinates();
     //(1) Compression
     //В sim_demo.py нет стадии свёртки с опорным сигналом, но скорее всего она тут нужна
     //SAR(Raw_data, new_sat.fs, new_sat.K_r, new_sat.tau_p, new_sat.V, new_sat.Lambda,
@@ -215,26 +229,23 @@ void RMA(){ //Range migration algorithm or omega-K algorithm
 
 
     //(2) RVP correction. Checked!
-    RVP_correct(Raw_data, new_sat.fs, new_sat.K_r, size_range, size_azimuth, new_sat.tau_p);
-    equality(Raw_data, "/home/ivan/CLionProjects/Omega-K/Example_with_rectangle_after_RVP_correct.txt","RVP", "2");
+    RVP_correct(Raw_data, new_sat);
+    equality(Raw_data, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_RVP_correct.txt","RVP", "2");
     //(2.1) Const ref
-    PHS_to_const_ref(Raw_data, new_sat.pos, new_sat.tau_p,new_sat.fs, new_sat.K_r, new_sat.f_c, size_azimuth);
-    equality(Raw_data, "/home/ivan/CLionProjects/Omega-K/Example_with_rectangle_after_constant_ref.txt","Constant_ref", "2");
+    PHS_to_const_ref(Raw_data, new_sat);
+    equality(Raw_data, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_constant_ref.txt","Constant_ref", "2");
     //(3) Azimuth FFT
     Azimuth_FFT(Raw_data, size_range, size_azimuth);
-    equality(Raw_data, "/home/ivan/CLionProjects/Omega-K/Example_with_rectangle_after_azimuth_fft.txt","Azimuth FFT", "2");
+    equality(Raw_data, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_azimuth_fft.txt","Azimuth FFT", "2");
     //(4) Matching filter
     vector<vector<double>> KY(size_azimuth, vector<double>(size_range));
     double KY_min = 0.0, KY_max = 0.0;
-    Matching_filter(Raw_data, size_azimuth, size_range, new_sat, KY, KY_min, KY_max);
+    Matching_filter(Raw_data, new_sat);
+    equality(Raw_data, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_matching_filter.txt","Matching filter", "2");
 
     //(5) Stolt interpolation
-    //double B_eff = K_r * tau_p;
-    //double P_o = cos(psi);
-    //double theta_p = (static_cast<double>(size_azimuth)/static_cast<double>(size_range))/((f_c/B_eff) - 0.5);
-    //double r_one = (4*M_PI/c)*(f_c - B_eff/2.0)*P_o;
-    //double Delta_X = 2 * r_one * tan(theta_p/2.0);
-    //double KR_max = *std::max_element(KR.begin(), KR.end());
+    Stolt_interpolation(Raw_data, new_sat);
+    equality(Raw_data, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_Stolt_interpolation.txt","Stolt interpolation", "2");
 
     vector<double> KY_model = fill_up(KY_min, KY_max, size_range);
     fftw_complex *New_phase;

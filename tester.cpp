@@ -29,12 +29,14 @@ void equality(vector<vector<complex<double>>>& in_mas, string file_with_comp_dat
     size_t azimuth_size = in_mas.size();
     size_t range_size = in_mas[0].size();
     double epsilon = 0.015;
-    double in_real,in_imag, sample_real, sample_imag;
     bool flag = false;
     double max_rel_error = 0.0;
     double rel_error = 0.0;
     int x, y;
-
+    int count_of_er = 0;
+    ofstream fout("Error_log_after_"+step_name+".txt");
+    fout << metrik << "\n";
+    fout << "----------------------------------------------" << "\n";
     for(size_t i = 0; i < azimuth_size;i++){
         for(size_t j = 0; j < range_size;j++){
             if(metrik == "2"){
@@ -45,20 +47,20 @@ void equality(vector<vector<complex<double>>>& in_mas, string file_with_comp_dat
 
             if(rel_error>= epsilon){
                 flag = true;
-                if(rel_error > max_rel_error){
-                    max_rel_error = rel_error;
-                    x = i;
-                    y = j;
-                }
+                max_rel_error = rel_error;
+                fout << i << " " << j << "\n";
+                fout << "Rel_error = " << rel_error << "\n";
+                fout << "My: " << in_mas[i][j] << "\n";
+                fout << "Sample: " << sample_mas[i][j] << "\n";
+                fout << "----------------------------------------------" << "\n";
+                count_of_er++;
             }
         }
     }
     if(flag){
-        cerr << step_name << ": error " << max_rel_error << "\n";
-        cerr << x << " " << y << "\n";
-        cerr << "My: " << in_mas[x][y] << "\n";
-        cerr << "Sample: " << sample_mas[x][y] << "\n";
+        cerr << step_name << " has " << count_of_er << " errors\n";
     }else{
         cerr << step_name << ": OK" << "\n";
     }
+    fout.close();
 }
