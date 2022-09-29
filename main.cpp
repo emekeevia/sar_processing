@@ -64,31 +64,9 @@ struct Satellite{
 
 };
 
-double complex_part(std::complex<double> c, string s){
-    if(s == "r"){
-        return c.real();
-    }else if(s == "i"){
-        return c.imag();
-    }
-    return 0.0;
-}
 
-vector<std::complex<double>> interp(vector<double>& KY,vector<std::complex<double>>& data,const vector<double>& KY_model, string s){
-    size_t size = data.size();
-    size_t pos;
-    vector<std::complex<double>> temp(size);
-    vector<double>::iterator low;
-    for(size_t i = 0; i < size;i++){
-        low = lower_bound(KY.begin(), KY.end(), KY_model[i]);
-        pos = low - KY.begin();
-        if(pos < size - 1){
-            temp[i] = KY[pos] + KY_model[i]*(complex_part(data[pos+1], s) - complex_part(data[pos+1], s))/(KY[pos+1] - KY[pos]);
-        }else{
-            temp[i] = data[size-1];
-        }
-    }
-    return temp;
-}
+
+
 
 template<typename T>
 void simple_shift(vector<T>& v){
@@ -192,16 +170,16 @@ void Azimuth_FFT(vector<vector<std::complex<double>>> &Raw_data, size_t size_ran
     fftw_destroy_plan(plan_f);
 }
 
-void Matching_filter(vector<vector<std::complex<double>>>& data, Satellite& sat){
+void Matching_filter(vector<vector<std::complex<double>>>& data, Satellite& sat, vector<double>& KR, vector<double>& KX){
     vector<vector<std::complex<double>>> filter(sat.size_azimuth, vector<std::complex<double>>(sat.size_range));
-    vector<double> KR(sat.size_range);
+    KR = vector<double>(sat.size_range);
 
 
     double phase_mf;
 
     vector<double> t = fill_up(-sat.ta/2, sat.ta/2, 1/sat.prf);// time axis in azimuth
     vector<double> tau = fill_up(-sat.tau_p/2, sat.tau_p/2, 1/sat.fs);// time axis in range
-    vector<double> KX = fill_up(-static_cast<int>(sat.size_azimuth/2), static_cast<int>(sat.size_azimuth/2), static_cast<int>(sat.size_azimuth)) * (2.0 * M_PI/sat.L);
+    KX = fill_up(-static_cast<int>(sat.size_azimuth/2), static_cast<int>(sat.size_azimuth/2), static_cast<int>(sat.size_azimuth)) * (2.0 * M_PI/sat.L);
     for(size_t i = 0; i < sat.size_azimuth;i++){
         //r_c = 0.0;//must depend on azimuth
         for(size_t j = 0;j < sat.size_range;j++){
@@ -212,7 +190,77 @@ void Matching_filter(vector<vector<std::complex<double>>>& data, Satellite& sat)
     }
 }
 
-void Stolt_interpolation(vector<vector<std::complex<double>>>& data,Satellite& sat){
+void fill_up_KY(vector<double>& KY, vector<double>& KR,double KX_i, Satellite& sat){
+    double temp;
+    for(size_t i = 0; i < sat.size_range;i++){
+        temp = KR[i] * KR[i] - KX_i*KX_i;
+        if(temp >= 0){
+            KY[i] = sqrt(temp);
+        }else{
+            KY[i] = 0.0;
+        }
+    }
+}
+
+void interp1d(vector<std::complex<double>>& data,vector<double>& KY_temp, vector<double>& KY, vector<complex<double>>& w, Satellite& sat){
+
+    //(1) смотрим есть ли элементы из KY в KY_temp
+    double KY_temp_max = *std::max_element(KY_temp.begin(), KY_temp.end());
+    double KY_temp_min = *std::min_element(KY_temp.begin(), KY_temp.end());
+    size_t start = lower_bound(KY.begin(), KY.end(), KY_temp_min) - KY.begin();
+    size_t finish = upper_bound(KY.begin(), KY.end(), KY_temp_max) - KY.begin();
+    if(finish-start > 0){
+        //(2) если элементы есть,то находим м/у какими точками KY_temp они лежат
+        for(size_t i = start; i < finish;i++){
+            size_t left = lower_bound(KY_temp.begin(), KY_temp.end(), KY[i]) - KY_temp.begin();//индекс, который указывает на первый элемент меньше заданного
+            complex<double> k = (data[left+1] - data[left])/(KY_temp[left+1] - KY_temp[left]);
+            w = w + vector<complex<double>>(sat.size_range,(data[left]+(KY[i] - KY_temp[left])*k));
+        }
+    }else if(finish == start){
+
+        size_t left = lower_bound(KY_temp.begin(), KY_temp.end(), KY[start]) - KY_temp.begin();//индекс, который указывает на первый элемент меньше заданного
+        complex<double> k = (data[left+1] - data[left])/(KY_temp[left+1] - KY_temp[left]);
+        w = w + vector<complex<double>>(sat.size_range,(data[left]+(KY[start] - KY_temp[left])*k));
+    }
+
+}
+
+
+void Stolt_interpolation(vector<vector<std::complex<double>>>& data,Satellite& sat, double KY_min, double KY_max, vector<double>& KR, vector<double>& KX){
+    vector<double> KY = fill_up(KY_min, KY_max, sat.size_range);
+    vector<vector<complex<double>>> S(sat.size_azimuth, vector<complex<double>>(sat.size_range, 0.0));
+    vector<double> KY_temp;
+    for(size_t i = 0; i < sat.size_azimuth; i++){
+        fill_up_KY(KY_temp, KR, KX[i], sat);
+        interp1d(data[i], KY_temp, KY, S[i], sat);
+    }
+    equality(S, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_Stolt_interpolation_first_part.txt","Stolt interpolation", "2");
+    /*
+      S = np.nan_to_num(S)
+    [p1,p2] = phs_inscribe(np.abs(S))
+    S_new = S[p1[1]:p2[1],
+              p1[0]:p2[0]]
+
+    #Create window
+    win_x = sig.taylor(S_new.shape[1],taylor)
+    win_x = np.tile(win_x, [S_new.shape[0],1])
+
+    win_y = sig.taylor(S_new.shape[0],taylor)
+    win_y = np.array([win_y]).T
+    win_y = np.tile(win_y, [1,S_new.shape[1]])
+
+    win = win_x*win_y
+
+    #Apply window
+    S_win = S_new*win
+
+    #Pad Spectrum
+    length = 2**(int(np.log2(S_new.shape[0]*upsample))+1)
+    pad_x = length-S_win.shape[1]
+    pad_y = length-S_win.shape[0]
+    S_pad = np.pad(S_win,((pad_y//2, pad_y//2),(pad_x//2,pad_x//2)), mode = 'constant')
+     */
+
 
 }
 void RMA(){ //Range migration algorithm or omega-K algorithm
@@ -240,12 +288,13 @@ void RMA(){ //Range migration algorithm or omega-K algorithm
     //(4) Matching filter
     vector<vector<double>> KY(size_azimuth, vector<double>(size_range));
     double KY_min = 0.0, KY_max = 0.0;
-    Matching_filter(Raw_data, new_sat);
+    vector<double> KX, KR;
+    Matching_filter(Raw_data, new_sat, KR, KX);
     equality(Raw_data, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_matching_filter.txt","Matching filter", "2");
 
     //(5) Stolt interpolation
-    Stolt_interpolation(Raw_data, new_sat);
-    equality(Raw_data, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_Stolt_interpolation.txt","Stolt interpolation", "2");
+    Stolt_interpolation(Raw_data, new_sat, KY_min, KY_max, KR, KX);
+    //equality(Raw_data, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_Stolt_interpolation_last_part.txt","Stolt interpolation", "2");
 
     vector<double> KY_model = fill_up(KY_min, KY_max, size_range);
     fftw_complex *New_phase;
