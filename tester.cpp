@@ -24,6 +24,7 @@ double metrik_2(complex<double> my,complex<double> example){
     return abs(my_abs - example_abs)/max(my_abs, example_abs);
 }
 
+
 void simple_equality(vector<vector<complex<double>>>& in_mas, string file_with_comp_data, string step_name, string metrik){
     vector<vector<complex<double>>> sample_mas = read_file(false, file_with_comp_data);
     size_t azimuth_size = in_mas.size();
@@ -42,7 +43,6 @@ void simple_equality(vector<vector<complex<double>>>& in_mas, string file_with_c
             }else if(metrik == "inf"){
                 rel_error = metrik_inf(in_mas[i][j], sample_mas[i][j]);
             }
-
             if(rel_error>= epsilon){
                 flag = true;
                 count_of_er++;
@@ -61,7 +61,7 @@ void equality(vector<vector<complex<double>>>& in_mas, string file_with_comp_dat
     vector<vector<complex<double>>> sample_mas = read_file(false, file_with_comp_data);
     size_t azimuth_size = in_mas.size();
     size_t range_size = in_mas[0].size();
-    double epsilon = 0.05;
+    double epsilon = 0.1;
     bool flag = false;
     double max_rel_error = 0.0;
     double rel_error = 0.0;
