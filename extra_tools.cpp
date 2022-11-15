@@ -9,9 +9,17 @@ vector<double> fill_up(const double& start,const double& finish, const double& s
     return mass;
 }
 
+vector<int> fill_up(const int& start, const int& finish){
+    vector<int> mass;
+    for(double temp = start; temp < finish;temp++){
+        mass.push_back(temp);
+    }
+    return mass;
+}
+
 vector<double> fill_up(const double& start,const double& finish, size_t N){
     vector<double> mass(N);
-    double step = (finish - start)/N;
+    double step = (finish - start)/(N-1);
     for(size_t i = 0; i < N;i++){
         mass[i] = start + i*step;
     }

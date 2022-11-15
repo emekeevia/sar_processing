@@ -19,6 +19,7 @@ using namespace std;
 vector<double> fill_up(const double& start,const double& finish, const double& step);
 vector<double> fill_up(const double& start,const double& finish, size_t N);
 vector<double> fill_up(const int& start,const int& finish, int N);
+vector<int> fill_up(const int& start, const int& finish);
 
 void conjugate(vector<complex<double>>& sopr, const vector<complex<double>>& orig);
 
@@ -49,6 +50,15 @@ std::vector<T> operator-(std::vector<T>& v1, T a){
     std::vector<T> temp(v1.size());
     for(size_t i = 0; i < v1.size();i++){
         temp[i] = v1[i]-a;
+    }
+    return temp;
+}
+
+template<typename T>
+std::vector<T> operator/(std::vector<T>& v1, T a){
+    std::vector<T> temp(v1.size());
+    for(size_t i = 0; i < v1.size();i++){
+        temp[i] = v1[i]/a;
     }
     return temp;
 }
@@ -90,7 +100,7 @@ T operator*(const T& v, D a){
 
 template<typename T>
 T operator*(const T& v1, const T& v2){
-    T temp;
+    T temp(v1.size());
     if(v1.size() != v2.size()){
         throw("Not equal size!");
     }
@@ -99,6 +109,7 @@ T operator*(const T& v1, const T& v2){
     }
     return temp;
 }
+
 
 
 template<typename T>
