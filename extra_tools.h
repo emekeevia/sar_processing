@@ -21,16 +21,37 @@ vector<double> fill_up(const double& start,const double& finish, size_t N);
 vector<double> fill_up(const int& start,const int& finish, int N);
 vector<int> fill_up(const int& start, const int& finish);
 
+vector<double> real(vector<std::complex<double>>& data);
+vector<double> imag(vector<std::complex<double>>& data);
+
+void shift(vector<vector<std::complex<double>>> &Raw_data);
+
+size_t partition(std::vector<double>& v, std::vector<int>& temp, size_t l, size_t r);
+void quick_sort(std::vector<double>& v, std::vector<int>& temp, size_t l, size_t r);
+
+void set_array(vector<vector<std::complex<double>>>& array, vector<double> values, vector<int> bound_r, vector<int> bound_c);
+
 void conjugate(vector<complex<double>>& sopr, const vector<complex<double>>& orig);
 
 vector<complex<double>> operator*(const vector<complex<double>>& v1, const vector<complex<double>>& v2);
 
-void iFFTshift(vector<complex<double>>& v);
+
 
 std::vector<std::vector<std::complex<double>>> read_file(bool pen_writing, string path);
 
 void Write_in_file(vector<vector<complex<double>>>& v, string file_name);
 
+
+template<typename T>
+void iFFTshift(vector<T>& v){
+    size_t middle;
+    if(v.size()%2 == 0){
+        middle = v.size()/2;
+    }else{
+        middle = v.size()/2 + 1;
+    }
+    rotate(v.begin(),v.begin() + middle,v.end());
+}
 
 template<typename T>
 T operator+(const T& v1, const T& v2){

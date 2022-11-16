@@ -1,17 +1,17 @@
-#include <iostream>
-#include <fstream>
+//#include <iostream>
+//#include <fstream>
 #include <vector>
-#include <complex.h>
 #include <complex>
-#include <iomanip>
+//#include <iomanip>
 #include <cmath>
 #include <string>
 #include <fftw3.h>
 #include <algorithm>
 #include "extra_tools.h"
 #include "CubicSlpine.h"
-#include "compression_algorithm.h"
+//#include "compression_algorithm.h"
 #include "tester.h"
+#include "Time_duration_file.h"
 
 struct Satellite{
     // Sensor parameters (ERS satellite)
@@ -19,8 +19,8 @@ struct Satellite{
     double K_r = 4.8e+12;     // FM Rate Range Chirp [1/s^2] --> up-chirp
     double tau_p = 4.5511111111111114e-5;       // Chirp duration [s]
     double V = 100.0;                // Effective satellite velocity [m/s]
-    double Lambda = 0.03;            // Length of carrier wave [m]
-    double R_0 = 1.0e+7;              // Range to center of antenna footprint [m]
+    //double Lambda = 0.03;            // Length of carrier wave [m]
+    //double R_0 = 1.0e+7;              // Range to center of antenna footprint [m]
     double ta = 1.95;                     // Aperture time [s]
     double prf = 1000.0;// Pulse Repitition Frequency [Hz]
     double c = 3.0e8;
@@ -68,26 +68,6 @@ struct Satellite{
 
 };
 
-
-
-
-
-template<typename T>
-void simple_shift(vector<T>& v){
-    vector<T> tmp(v.begin()+(v.size()/2), v.end());
-    for(size_t i = 0; i < v.size()/2;i++){
-        tmp.push_back(v[i]);
-    }
-    v = tmp;
-}
-
-void shift(vector<vector<std::complex<double>>> &Raw_data){
-    size_t az_size = Raw_data.size();
-    for(size_t i = 0; i < az_size;i++){
-        simple_shift(Raw_data[i]);
-    }
-    simple_shift(Raw_data);
-}
 
 void RVP_correct(vector<vector<std::complex<double>>> &Raw_data, Satellite& sat){
     double c = 3e8;
@@ -208,48 +188,12 @@ void fill_up_KY(vector<double>& KY, vector<double>& KR,double KX_i, Satellite& s
 }
 
 
-
-size_t partition(std::vector<double>& v, std::vector<int>& temp, size_t l, size_t r){
-    double pivot = v[(l + r) / 2];
-    size_t i = l;
-    size_t j = r;
-    while (i <= j){
-        while (v[i] < pivot){
-            i++;
-        }
-        while (v[j] > pivot){
-            j--;
-        }
-        if (i >= j){
-            break;
-        }
-
-        swap(v[i], v[j]);
-        swap(temp[i++], temp[j--]);
-    }
-
-    return j;
-}
-
-
-void quick_sort(std::vector<double>& v, std::vector<int>& temp, size_t l, size_t r){
-    if(l < r){
-        size_t q = partition(v,temp, l, r);
-        quick_sort(v, temp, l, q);
-        quick_sort(v, temp, q + 1, r);
-    }
-
-}
-
 std::vector<int> argsort(std::vector<double>& v){
     std::vector<int> temp(v.size(), 0);
     for(int i = 0; i < v.size();i++){
         temp[i] = i;
     }
-    //bubble_sort(v, temp);
     quick_sort(v, temp,0, v.size() - 1);
-    //std::reverse(temp.begin(), temp.end()); for bubble_sort
-    //std::reverse(v.begin(), v.end()); for bubble_sort
     return temp;
 }
 
@@ -278,7 +222,7 @@ void interp1d(std::vector<double>& x,std::vector<double>& y, std::vector<double>
             entry[i] = false;
         }
 
-        x_new_indices[i]=start;
+        x_new_indices[i]=(int)start;
     }
 
     std::vector<int> lo = x_new_indices - 1;
@@ -317,27 +261,13 @@ void interp1d(std::vector<double>& x,std::vector<double>& y, std::vector<double>
 
 }
 
-vector<double> real(vector<std::complex<double>>& data){
-    vector<double> temp(data.size());
-    for(size_t i = 0; i < data.size();i++){
-        temp[i] = data[i].real();
-    }
-    return temp;
-}
 
-vector<double> imag(vector<std::complex<double>>& data){
-    vector<double> temp(data.size());
-    for(size_t i = 0; i < data.size();i++){
-        temp[i] = data[i].imag();
-    }
-    return temp;
-}
 
 
 vector<double> taylor(size_t nsamples, size_t S_L=43){
     vector<double> xi = fill_up(-0.5, 0.5, nsamples);
 
-    double A = (1.0/M_PI) * acosh(pow(10.0, (S_L*1.0)/20.0));
+    double A = (1.0/M_PI) * acosh(pow(10.0, ((double)S_L*1.0)/20.0));
     int n_bar = (int)(2*A*A + 0.5) + 1;
     double sigma_p = (double)n_bar/sqrt(A*A+((double)n_bar-0.5)*((double)n_bar-0.5));
     vector<int> m = fill_up(1, n_bar);
@@ -389,21 +319,8 @@ vector<vector<T>> tile_y(vector<T>& A, vector<int> reps){
     return temp;
 }
 
-void set_array(vector<vector<std::complex<double>>>& array, vector<double> values, vector<int> bound_r, vector<int> bound_c){
-    for(size_t i = bound_r[0];i < bound_r[1];i++){
-        for(size_t j = bound_c[0]; j < bound_c[1];j++){
-            array[i][j] = values[0];
-        }
-    }
-}
 
-void synch(vector<vector<std::complex<double>>>& array, vector<vector<std::complex<double>>>& roi){
-    for(size_t i=0; i < roi.size();i++){
-        for(size_t j =0; j < roi[0].size();j++){
-            array[i][j] = roi[i][j];
-        }
-    }
-}
+
 
 vector<vector<complex<double>>> pad_constant(vector<vector<std::complex<double>>>& array,vector<vector<int>> pad_width){
 
@@ -454,13 +371,12 @@ vector<vector<complex<double>>> pad_constant(vector<vector<std::complex<double>>
 
         }
 
-        //synch(new_array, roi);
+
         //k = axis
         //pad_width[k] = width_pair
         //values[k] = value_pair
-        //
+
     }
-    //original_area_slice = ((pad_width[0][0], pad_width[0][0] + array.size()), (pad_width[1][0], pad_width[1][0] + array[0].size()))
     return new_array;
 }
 
@@ -494,14 +410,13 @@ void Stolt_interpolation(vector<vector<std::complex<double>>>& data,Satellite& s
         }
 
     }
-    //equality(S, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_Stolt_interpolation_first_part.txt","Stolt interpolation part 1", "2");
-    //S = read_file(false, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_Stolt_interpolation_first_part.txt");
+
     for(size_t i = 0; i < sat.size_azimuth-1;i++){
         for(size_t j = 0; j < sat.size_range-1;j++){
             S_new[i][j] = S[i][j];
         }
     }
-    //проверить всё, что ниже
+
     vector<double> win_x = taylor(S_new[0].size(), 17);
     vector<int> new_v_x = {(int)S_new.size(), 1};
     vector<vector<double>> win_x_new = tile_x(win_x, new_v_x);
@@ -515,23 +430,22 @@ void Stolt_interpolation(vector<vector<std::complex<double>>>& data,Satellite& s
 
 
     vector<vector<complex<double>>> w_c(win.size(), vector<complex<double>>(win[0].size()));
+
     for(size_t i = 0;i < win.size();i++){
         for(size_t j = 0;j < win[0].size();j++){
             w_c[i][j] = complex<double>(win[i][j]);
         }
 
     }
-    vector<vector<complex<double>>> S_win = S_new*w_c;
-    //equality(S_win, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_Stolt_interpolation_second_part.txt","Stolt interpolation part 2", "2");
 
+    vector<vector<complex<double>>> S_win = S_new*w_c;
 
     int length = pow(2, (int)(log2(S_new.size()*upsample))+1);
-    int pad_x = length-S_win[0].size();
-    int pad_y = length-S_win.size();
-
+    int pad_x = length-(int)S_win[0].size();
+    int pad_y = length-(int)S_win.size();
 
     vector<vector<complex<double>>> S_pad = pad_constant(S_win,{{pad_y/2, pad_y/2},{pad_x/2,pad_x/2}});
-    //equality(S_pad, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_before_2D_FFT.txt","Stolt interpolation part 3", "2");
+
     data = S_pad;
 }
 void RMA(){ //Range migration algorithm or omega-K algorithm
@@ -547,7 +461,7 @@ void RMA(){ //Range migration algorithm or omega-K algorithm
     //    new_sat.R_0, new_sat.ta, new_sat.prf, size_azimuth, size_range);
 
 
-    //(2) RVP correction. Checked!
+    //(2) RVP correction.
     RVP_correct(Raw_data, new_sat);
     simple_equality(Raw_data, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_RVP_correct.txt","RVP", "2");
     //(2.1) Const ref
@@ -568,11 +482,12 @@ void RMA(){ //Range migration algorithm or omega-K algorithm
     //Raw_data = read_file(false, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_matching_filter.txt");
 
     Stolt_interpolation(Raw_data, new_sat, KY_min, KY_max, KR, KX, 2);
-    equality(Raw_data, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_before_2D_FFT.txt","Stolt interpolation", "2");
+    simple_equality(Raw_data, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_before_2D_FFT.txt","Stolt interpolation", "2");
     //(6) 2D-IFFT
     Raw_data = read_file(false, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_before_2D_FFT.txt");
     size_azimuth = Raw_data.size();
     size_range = Raw_data[0].size();
+    shift(Raw_data);
     fftw_complex *New_phase;
     New_phase = (fftw_complex*) fftw_malloc(Raw_data.size()*Raw_data[0].size()* sizeof(fftw_complex));
     //fftw_complex New_phase[size_range][size_azimuth];
@@ -587,7 +502,7 @@ void RMA(){ //Range migration algorithm or omega-K algorithm
     }
 
 
-    fftw_plan plan = fftw_plan_dft_2d(size_azimuth,size_range,
+    fftw_plan plan = fftw_plan_dft_2d((int)size_azimuth,(int)size_range,
                                       New_phase, Result,
                                       FFTW_BACKWARD, FFTW_ESTIMATE);
 
@@ -595,15 +510,20 @@ void RMA(){ //Range migration algorithm or omega-K algorithm
 
     for(size_t i = 0;i < size_azimuth; i++){
         for(size_t j = 0; j < size_range;j++){
-            Raw_data[i][j] = std::complex<double>(Result[j+size_range*i][0],Result[j+size_range*i][1])/(double)(size_range* size_azimuth);
+            Raw_data[i][j] = std::complex<double>(Result[j+size_range*i][0],Result[j+size_range*i][1]);
         }
     }
+
     fftw_destroy_plan(plan);
-    equality(Raw_data, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_2D_FFT.txt","2D FFT", "2");
+    shift(Raw_data);
+    simple_equality(Raw_data, "/home/ivanemekeev/CLionProjects/SAR-data/Example_with_rectangle_after_2D_FFT.txt","2D FFT", "2");
     //Write_in_file(Raw_data, "Test_file_for_omega_k");
 }
 
 int main() {
-    RMA();
+    {
+        TimeDuration t("RMA");
+        RMA();
+    }
     return 0;
 }

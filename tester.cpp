@@ -31,9 +31,7 @@ void simple_equality(vector<vector<complex<double>>>& in_mas, string file_with_c
     size_t range_size = in_mas[0].size();
     double epsilon = 0.015;
     bool flag = false;
-    double max_rel_error = 0.0;
     double rel_error = 0.0;
-    int x, y;
     int count_of_er = 0;
 
     for(size_t i = 0; i < azimuth_size;i++){
@@ -65,7 +63,6 @@ void equality(vector<vector<complex<double>>>& in_mas, string file_with_comp_dat
     bool flag = false;
     double max_rel_error = 0.0;
     double rel_error = 0.0;
-    int x, y;
     int count_of_er = 0;
     ofstream fout("Error_log_after_"+step_name+".txt");
     fout << "metrika = " <<metrik << "\n";

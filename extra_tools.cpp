@@ -9,6 +9,22 @@ vector<double> fill_up(const double& start,const double& finish, const double& s
     return mass;
 }
 
+vector<double> real(vector<std::complex<double>>& data){
+    vector<double> temp(data.size());
+    for(size_t i = 0; i < data.size();i++){
+        temp[i] = data[i].real();
+    }
+    return temp;
+}
+
+vector<double> imag(vector<std::complex<double>>& data){
+    vector<double> temp(data.size());
+    for(size_t i = 0; i < data.size();i++){
+        temp[i] = data[i].imag();
+    }
+    return temp;
+}
+
 vector<int> fill_up(const int& start, const int& finish){
     vector<int> mass;
     for(double temp = start; temp < finish;temp++){
@@ -53,10 +69,54 @@ vector<complex<double>> operator*(const vector<complex<double>>& v1, const vecto
     return temp;
 }
 
-void iFFTshift(vector<complex<double>>& v){
-    size_t N = v.size();
-    rotate(v.begin(),v.begin() + N/2,v.end());
+void shift(vector<vector<std::complex<double>>> &Raw_data){
+    size_t az_size = Raw_data.size();
+    for(size_t i = 0; i < az_size;i++){
+        iFFTshift(Raw_data[i]);
+    }
+    iFFTshift(Raw_data);
 }
+
+size_t partition(std::vector<double>& v, std::vector<int>& temp, size_t l, size_t r){
+    double pivot = v[(l + r) / 2];
+    size_t i = l;
+    size_t j = r;
+    while (i <= j){
+        while (v[i] < pivot){
+            i++;
+        }
+        while (v[j] > pivot){
+            j--;
+        }
+        if (i >= j){
+            break;
+        }
+
+        swap(v[i], v[j]);
+        swap(temp[i++], temp[j--]);
+    }
+
+    return j;
+}
+
+
+void quick_sort(std::vector<double>& v, std::vector<int>& temp, size_t l, size_t r){
+    if(l < r){
+        size_t q = partition(v,temp, l, r);
+        quick_sort(v, temp, l, q);
+        quick_sort(v, temp, q + 1, r);
+    }
+
+}
+
+void set_array(vector<vector<std::complex<double>>>& array, vector<double> values, vector<int> bound_r, vector<int> bound_c){
+    for(size_t i = bound_r[0];i < bound_r[1];i++){
+        for(size_t j = bound_c[0]; j < bound_c[1];j++){
+            array[i][j] = values[0];
+        }
+    }
+}
+
 std::vector<std::vector<std::complex<double>>> read_file(bool pen_writing, string path){
     //Test_Image.mat
     std::vector<std::vector<std::complex<double>>> v;
