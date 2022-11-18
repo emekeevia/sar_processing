@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <fstream>
 
+
 using namespace std;
 
 
@@ -35,12 +36,36 @@ void conjugate(vector<complex<double>>& sopr, const vector<complex<double>>& ori
 
 vector<complex<double>> operator*(const vector<complex<double>>& v1, const vector<complex<double>>& v2);
 
-
+vector<vector<complex<double>>> pad_constant(vector<vector<std::complex<double>>>& array,vector<vector<int>> pad_width);
+vector<double> taylor(size_t nsamples, size_t S_L);
+void interp1d(std::vector<double>& x,std::vector<double>& y, std::vector<double>& x_new, std::vector<double>& y_new, string kind = "linear");
+std::vector<int> argsort(std::vector<double>& v);
+void fill_up_KY(vector<double>& KY, vector<double>& KR,double KX_i);
 
 std::vector<std::vector<std::complex<double>>> read_file(bool pen_writing, string path);
 
 void Write_in_file(vector<vector<complex<double>>>& v, string file_name);
 
+template<typename T>
+vector<vector<T>> tile_x(vector<T>& A, vector<int> reps){
+    vector<vector<T>> temp(reps[0], vector<T>(reps[1]*A.size(), 0.0));
+    for(size_t i = 0; i < reps[0];i++){
+        for(size_t j = 0; j < reps[1]*A.size();j++) {
+            temp[i][j] = A[j % A.size()];
+        }
+    }
+    return temp;
+}
+template<typename T>
+vector<vector<T>> tile_y(vector<T>& A, vector<int> reps){
+    vector<vector<T>> temp(reps[0]*A.size(), vector<T>(reps[1], 0.0));
+    for(size_t i = 0; i < reps[0]*A.size();i++){
+        for(size_t j = 0; j < reps[1];j++) {
+            temp[i][j] = A[i % A.size()];
+        }
+    }
+    return temp;
+}
 
 template<typename T>
 void iFFTshift(vector<T>& v){

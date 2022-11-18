@@ -2,9 +2,10 @@ cmake_minimum_required(VERSION 3.23)
 project(Omega_K)
 
 set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
 
-
-set(SOURCE_LIB extra_tools.cpp compression_algorithm.cpp tester.h tester.cpp CubicSlpine.h)			# Тоже самое, но для библиотеки
+set(SOURCE_LIB extra_tools.cpp compression_algorithm.cpp tester.h tester.cpp CubicSlpine.h Time_duration_file.h)			# Тоже самое, но для библиотеки
 
 set(SOURCE_EXE main.cpp)		# Установка переменной со списком исходников для исполняемого файла
 
